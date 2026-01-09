@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship  # <-- add this
 from models.database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -18,3 +20,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True))
+    # Relationship
+    services = relationship("Service", back_populates="provider")
+
