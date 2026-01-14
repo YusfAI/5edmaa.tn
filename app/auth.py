@@ -5,19 +5,25 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select , and_
 from sqlalchemy.ext.asyncio import AsyncSession
-
+# from ..core.database import get_db 
 from .config import settings
 from .database import get_db
 from .security import verify_password, hash_password
-from .user import User, UserRole, WorkerProfile, ClientProfile
+from .user import User, UserRole, WorkerProfile, ClientProfile 
+
+# from ..models.user import User, UserRole
 
 
 
-router = APIRouter()
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+#-----------------
+router = APIRouter(prefix="/auth", tags=["auth"])
+#-----------------
+
 
 
 class RegisterResponse(BaseModel):
@@ -99,7 +105,7 @@ async def register(
         worker_profile = WorkerProfile(
             user_id=user.id,
             location=address,   # use location as address for now
-            verified=False,
+            verified=True,
         )
         db.add(worker_profile)
     else:
@@ -189,3 +195,12 @@ async def get_current_admin(
             detail="Admin only",
         )
     return current_user
+
+
+
+
+
+
+
+
+
