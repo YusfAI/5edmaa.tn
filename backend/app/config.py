@@ -5,7 +5,7 @@ from pydantic import BaseModel
 class Settings(BaseModel):
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:password@localhost:5432/5edma_db",
+        "postgresql+asyncpg://edmaa_user:***REDACTED***@localhost:5432/5edma_tn",
     )
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
