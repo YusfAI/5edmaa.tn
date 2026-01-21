@@ -3,9 +3,15 @@ from sqlalchemy import text
 from .database import engine, AsyncSessionLocal
 from .auth import router as auth_router, get_current_admin
 from .user import User, WorkerProfile
+from .admin import router as admin_router
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from .jobs import router as jobs_router
+from .service import router as services_router
+from .bookings import router as bookings_router
+
+
 
 app = FastAPI(
     title="5edma.tn API",
@@ -13,7 +19,10 @@ app = FastAPI(
 )
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
-
+app.include_router(admin_router)
+app.include_router(jobs_router)
+app.include_router(services_router)
+app.include_router(bookings_router) 
 
 @app.get("/health")
 async def health_check():

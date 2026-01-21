@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional , List , Dict , Any 
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -7,6 +7,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from .config import settings
 from .database import get_db
@@ -19,6 +20,56 @@ router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+
+class ClientMeResponse(BaseModel):
+    id: int
+    email: str
+    phone: str
+    role: str
+
+    full_name: Optional[str] = None
+    company_name: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+
+    verified: bool  # NEW
+
+
+class WorkerMeResponse(BaseModel):
+    # User info
+    id: int
+    email: str
+    phone: str
+    role: str  # "worker"
+
+    # Profile info
+    bio: Optional[str] = None
+    categories: Optional[List[str]] = None
+    hourly_rate: Optional[float] = None
+    location: Optional[str] = None
+    availability: Optional[Dict[str, Any]] = None
+    portfolio_urls: Optional[List[str]] = None
+
+    # Status flags
+    verified: bool
+    premium_until: Optional[datetime] = None
+    rating: Optional[float] = None
+
+
+class ClientProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    company_name: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+
+
+class WorkerProfileUpdate(BaseModel):
+    bio: Optional[str] = None
+    categories: Optional[List[str]] = None
+    hourly_rate: Optional[float] = None
+    location: Optional[str] = None
+    availability: Optional[Dict[str, object]] = None
+    portfolio_urls: Optional[List[str]] = None
 
 class RegisterResponse(BaseModel):
     id: int
@@ -129,6 +180,17 @@ async def register(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 @router.post("/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -180,6 +242,66 @@ async def get_current_user(
     return user
 
 
+async def get_verified_worker(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if current_user.role != UserRole.worker:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Workers only",
+        )
+    
+    # Eager load worker_profile to avoid lazy loading
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.worker_profile))
+        .where(User.id == current_user.id)
+    )
+    user = result.scalar_one()
+    
+    if not user.worker_profile or not user.worker_profile.verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Worker account not verified yet",
+        )
+    
+    return user
+
+
+async def get_verified_client(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if current_user.role != UserRole.client:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Clients only",
+        )
+    
+    # Eager load client_profile to avoid lazy loading
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.client_profile))
+        .where(User.id == current_user.id)
+        .limit(1)
+    )
+    user = result.scalar_one()
+    
+    if not user.client_profile or not user.client_profile.verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client account not verified yet",
+        )
+    
+    return user
+
+
+
+
+
+
+
 async def get_current_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
@@ -189,3 +311,160 @@ async def get_current_admin(
             detail="Admin only",
         )
     return current_user
+
+
+
+@router.put("/worker/profile", response_model=WorkerProfileUpdate)
+async def update_worker_profile(
+    data: WorkerProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != UserRole.worker:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workers can update worker profile",
+        )
+
+    result = await db.execute(
+        select(WorkerProfile).where(WorkerProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    if data.bio is not None:
+        profile.bio = data.bio
+    if data.categories is not None:
+        profile.categories = data.categories
+    if data.hourly_rate is not None:
+        profile.hourly_rate = data.hourly_rate
+    if data.location is not None:
+        profile.location = data.location
+    if data.availability is not None:
+        profile.availability = data.availability
+    if data.portfolio_urls is not None:
+        profile.portfolio_urls = data.portfolio_urls
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return WorkerProfileUpdate(
+        bio=profile.bio,
+        categories=profile.categories,
+        hourly_rate=float(profile.hourly_rate) if profile.hourly_rate is not None else None,
+        location=profile.location,
+        availability=profile.availability,
+        portfolio_urls=profile.portfolio_urls,
+    )
+
+
+@router.put("/client/profile", response_model=ClientProfileUpdate)
+async def update_client_profile(
+    data: ClientProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != UserRole.client:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only clients can update client profile",
+        )
+
+    result = await db.execute(
+        select(ClientProfile).where(ClientProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Client profile not found")
+
+    if data.full_name is not None:
+        profile.full_name = data.full_name
+    if data.company_name is not None:
+        profile.company_name = data.company_name
+    if data.bio is not None:
+        profile.bio = data.bio
+    if data.location is not None:
+        profile.location = data.location
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return ClientProfileUpdate(
+        full_name=profile.full_name,
+        company_name=profile.company_name,
+        bio=profile.bio,
+        location=profile.location,
+    )
+
+
+@router.get("/worker/me", response_model=WorkerMeResponse)
+async def get_worker_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Only workers can call this
+    if current_user.role != UserRole.worker:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workers can access this endpoint",
+        )
+
+    # Load worker profile
+    result = await db.execute(
+        select(WorkerProfile).where(WorkerProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+
+    return WorkerMeResponse(
+        id=current_user.id,
+        email=current_user.email,
+        phone=current_user.phone,
+        role=current_user.role.value,
+        bio=profile.bio,
+        categories=profile.categories,
+        hourly_rate=float(profile.hourly_rate) if profile.hourly_rate is not None else None,
+        location=profile.location,
+        availability=profile.availability,
+        portfolio_urls=profile.portfolio_urls,
+        verified=profile.verified,
+        premium_until=profile.premium_until,
+        rating=float(profile.rating) if profile.rating is not None else None,
+    )
+
+@router.get("/client/me", response_model=ClientMeResponse)
+async def get_client_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Only clients can call this
+    if current_user.role != UserRole.client:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only clients can access this endpoint",
+        )
+
+    # Load client profile
+    result = await db.execute(
+        select(ClientProfile).where(ClientProfile.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Client profile not found")
+
+    return ClientMeResponse(
+    	id=current_user.id,
+    	email=current_user.email,
+    	phone=current_user.phone,
+    	role=current_user.role.value,
+    	full_name=profile.full_name,
+    	company_name=profile.company_name,
+    	bio=profile.bio,
+    	location=profile.location,
+    	verified=profile.verified,  # NEW
+)
+

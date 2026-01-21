@@ -1,8 +1,8 @@
-"""Create users worker_profiles client_profiles UML
+"""\v1_final\
 
-Revision ID: f3d33e4ef143
+Revision ID: 8c519d11eeac
 Revises: 
-Create Date: 2026-01-09 22:44:14.735499
+Create Date: 2026-01-14 18:07:35.787732
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f3d33e4ef143'
+revision: str = '8c519d11eeac'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

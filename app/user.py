@@ -1,10 +1,5 @@
 from enum import Enum as PyEnum
 from typing import List, Optional
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, func, Enum
-from sqlalchemy.orm import declarative_base, relationship
-from sqlalchemy.dialects.postgresql import ARRAY
-
-Base = declarative_base()
 
 from sqlalchemy import (
     String,
@@ -15,53 +10,13 @@ from sqlalchemy import (
     JSON,
     DateTime,
     func,
-    Boolean,          # 👈 add this
+    Text,
+    Boolean,
 )
-
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
-
-
-
-class Service(Base):
-    __tablename__ = "services"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-
-    # Worker who offers this service (must be a user with role=worker)
-    worker_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
-    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-
-    price: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(10, 2), nullable=True
-    )
-
-    location: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
-    )
-
-    created_at: Mapped["DateTime"] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped["DateTime"] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    # Optional relationship back to the user (worker)
-    worker: Mapped["User"] = relationship("User", backref="services")
-
 
 
 class UserRole(str, PyEnum):
@@ -81,10 +36,11 @@ class User(Base):
         Enum(UserRole, name="user_role"),
         nullable=False,
     )
+
     created_at: Mapped["DateTime"] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    is_verified = Column(Boolean, default=False) 
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped["DateTime"] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -96,6 +52,18 @@ class User(Base):
         back_populates="user", uselist=False
     )
 
+    # Jobs created by this user (client role)
+    job_offers: Mapped[List["JobOffer"]] = relationship(
+        "JobOffer",
+        back_populates="client",
+    )
+
+    # Services offered by this user (worker role)
+    services: Mapped[List["Service"]] = relationship(
+        "Service",
+        back_populates="provider",
+    )
+
 
 class WorkerProfile(Base):
     __tablename__ = "worker_profiles"
@@ -103,6 +71,7 @@ class WorkerProfile(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), primary_key=True
     )
+
     bio: Mapped[Optional[str]] = mapped_column(nullable=True)
     categories: Mapped[Optional[List[str]]] = mapped_column(
         ARRAY(String), nullable=True
@@ -115,6 +84,7 @@ class WorkerProfile(Base):
     portfolio_urls: Mapped[Optional[List[str]]] = mapped_column(
         ARRAY(String), nullable=True
     )
+
     verified: Mapped[bool] = mapped_column(default=False)
     premium_until: Mapped[Optional["DateTime"]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -130,9 +100,17 @@ class ClientProfile(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), primary_key=True
     )
+
     company_name: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
     )
     location: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    full_name: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    verified: Mapped[bool] = mapped_column(default=False)
 
     user: Mapped["User"] = relationship(back_populates="client_profile")
