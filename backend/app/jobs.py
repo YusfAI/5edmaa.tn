@@ -114,6 +114,15 @@ class JobApplicationOut(BaseModel):
     created_at: datetime
 
 
+class JobOfferUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    location: Optional[str] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+
+
 # === ENDPOINTS ===
 @router.post("", response_model=JobOfferOut, status_code=status.HTTP_201_CREATED)
 async def create_job(
@@ -201,6 +210,54 @@ async def search_jobs(
         )
         for job in jobs
     ]
+
+@router.get("/my", response_model=List[JobOfferOut])
+async def list_my_jobs(
+    status_filter: Optional[JobStatus] = Query(None),
+    current_client: User = Depends(get_verified_client),
+    db: AsyncSession = Depends(get_db),
+):
+    """List jobs created by the current client, optionally filtered by status."""
+    query = select(JobOffer).where(JobOffer.client_id == current_client.id)
+
+    if status_filter is not None:
+        query = query.where(JobOffer.status == status_filter)
+
+    query = query.order_by(JobOffer.created_at.desc())
+
+    result = await db.execute(query)
+    jobs = result.scalars().all()
+
+    # Compute application counts
+    job_ids = [job.id for job in jobs]
+    count_dict: dict[int, int] = {}
+    if job_ids:
+        counts = await db.execute(
+            select(JobApplication.job_id, func.count(JobApplication.id))
+            .where(JobApplication.job_id.in_(job_ids))
+            .group_by(JobApplication.job_id)
+        )
+        count_dict = dict(counts.all())
+
+    return [
+        JobOfferOut(
+            id=job.id,
+            title=job.title,
+            description=job.description,
+            category=job.category,
+            location=job.location,
+            budget_min=job.budget_min,
+            budget_max=job.budget_max,
+            status=job.status,
+            boost_until=job.boost_until,
+            client_id=job.client_id,
+            created_at=job.created_at,
+            application_count=count_dict.get(job.id, 0),
+        )
+        for job in jobs
+    ]
+
+
 
 
 @router.post("/{job_id}/apply", response_model=JobApplicationOut, status_code=status.HTTP_201_CREATED)
@@ -325,3 +382,280 @@ async def reject_application(
     await db.refresh(application)
 
     return {"message": "Application rejected", "status": application.status}
+
+
+
+@router.post("/{job_id}/applications/{application_id}/withdraw")
+async def withdraw_application(
+    job_id: int,
+    application_id: int,
+    current_worker: User = Depends(get_verified_worker),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Worker withdraws their own pending application.
+    Internally we reuse status='rejected' to mean it is no longer active.
+    """
+    # 1) Load application and check it belongs to this worker and job
+    application = await db.get(JobApplication, application_id)
+    if not application or application.job_id != job_id:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    if application.worker_id != current_worker.id:
+        raise HTTPException(status_code=403, detail="Not your application")
+
+    # 2) Only pending applications can be withdrawn
+    if application.status != JobApplicationStatus.pending:
+        raise HTTPException(status_code=400, detail="Only pending applications can be withdrawn")
+
+    # 3) Mark as rejected (withdrawn)
+    application.status = JobApplicationStatus.rejected
+    await db.commit()
+    await db.refresh(application)
+
+    return {
+        "message": "Application withdrawn",
+        "status": application.status,
+    }
+
+
+
+
+
+@router.post("/{job_id}/complete", response_model=JobOfferOut)
+async def complete_job(
+    job_id: int,
+    current_client: User = Depends(get_verified_client),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Mark a job as completed/finished.
+    Internally this sets status=closed so it is no longer active.
+    """
+    job = await db.get(JobOffer, job_id)
+    if not job or job.client_id != current_client.id:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # If already closed, just return current state
+    if job.status == JobStatus.closed:
+        result = await db.execute(
+            select(func.count(JobApplication.id)).where(
+                JobApplication.job_id == job.id
+            )
+        )
+        application_count = result.scalar() or 0
+
+        return JobOfferOut(
+            id=job.id,
+            title=job.title,
+            description=job.description,
+            category=job.category,
+            location=job.location,
+            budget_min=job.budget_min,
+            budget_max=job.budget_max,
+            status=job.status,
+            boost_until=job.boost_until,
+            client_id=job.client_id,
+            created_at=job.created_at,
+            application_count=application_count,
+        )
+
+    # Mark as closed/completed
+    job.status = JobStatus.closed
+    await db.commit()
+    await db.refresh(job)
+
+    result = await db.execute(
+        select(func.count(JobApplication.id)).where(
+            JobApplication.job_id == job.id
+        )
+    )
+    application_count = result.scalar() or 0
+
+    return JobOfferOut(
+        id=job.id,
+        title=job.title,
+        description=job.description,
+        category=job.category,
+        location=job.location,
+        budget_min=job.budget_min,
+        budget_max=job.budget_max,
+        status=job.status,
+        boost_until=job.boost_until,
+        client_id=job.client_id,
+        created_at=job.created_at,
+        application_count=application_count,
+    )
+
+
+
+@router.patch("/{job_id}", response_model=JobOfferOut)
+async def update_job(
+    job_id: int,
+    data: JobOfferUpdate,
+    current_client: User = Depends(get_verified_client),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a job offer - only by its owner client, while it's still open and not committed."""
+    # 1) Check ownership
+    job = await db.get(JobOffer, job_id)
+    if not job or job.client_id != current_client.id:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # 2) Only open jobs can be edited
+    if job.status != JobStatus.open:
+        raise HTTPException(status_code=400, detail="Only open jobs can be edited")
+
+    # 3) Forbid edits if any application has been accepted
+    result = await db.execute(
+        select(func.count(JobApplication.id)).where(
+            JobApplication.job_id == job_id,
+            JobApplication.status == JobApplicationStatus.accepted,
+        )
+    )
+    accepted_count = result.scalar() or 0
+    if accepted_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot modify job after an application has been accepted",
+        )
+
+    # 4) Apply allowed changes
+    update_data = data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(job, key, value)
+
+    await db.commit()
+    await db.refresh(job)
+
+    # 5) Recalculate application_count for response
+    result = await db.execute(
+        select(func.count(JobApplication.id)).where(JobApplication.job_id == job.id)
+    )
+    application_count = result.scalar() or 0
+
+    return JobOfferOut(
+        id=job.id,
+        title=job.title,
+        description=job.description,
+        category=job.category,
+        location=job.location,
+        budget_min=job.budget_min,
+        budget_max=job.budget_max,
+        status=job.status,
+        boost_until=job.boost_until,
+        client_id=job.client_id,
+        created_at=job.created_at,
+        application_count=application_count,
+    )
+
+
+
+@router.delete("/{job_id}")
+async def delete_or_close_job(
+    job_id: int,
+    current_client: User = Depends(get_verified_client),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Try to delete a job offer.
+
+    - If the job has no applications: hard delete it.
+    - If the job has applications: just close it (status=closed).
+    """
+    # 1) Check ownership
+    job = await db.get(JobOffer, job_id)
+    if not job or job.client_id != current_client.id:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # 2) Count applications
+    result = await db.execute(
+        select(func.count(JobApplication.id)).where(JobApplication.job_id == job_id)
+    )
+    application_count = result.scalar() or 0
+
+    if application_count == 0:
+        # No worker has interacted: safe to delete
+        await db.delete(job)
+        await db.commit()
+        return {"message": "Job deleted"}
+    else:
+        # There is history: close instead of deleting
+        job.status = JobStatus.closed
+        await db.commit()
+        await db.refresh(job)
+        return {
+            "message": "Job has applications, so it was closed instead of deleted",
+            "status": job.status,
+        }
+
+
+@router.post("/{job_id}/close", response_model=JobOfferOut)
+async def close_job(
+    job_id: int,
+    current_client: User = Depends(get_verified_client),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Close a job offer without deleting it.
+    - Only the owner client can close.
+    - Closed jobs no longer appear in public search.
+    """
+    # 1) Load job and check ownership
+    job = await db.get(JobOffer, job_id)
+    if not job or job.client_id != current_client.id:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # 2) If already closed, just return current state
+    if job.status == JobStatus.closed:
+        # still recompute application_count for the response
+        result = await db.execute(
+            select(func.count(JobApplication.id)).where(
+                JobApplication.job_id == job.id
+            )
+        )
+        application_count = result.scalar() or 0
+
+        return JobOfferOut(
+            id=job.id,
+            title=job.title,
+            description=job.description,
+            category=job.category,
+            location=job.location,
+            budget_min=job.budget_min,
+            budget_max=job.budget_max,
+            status=job.status,
+            boost_until=job.boost_until,
+            client_id=job.client_id,
+            created_at=job.created_at,
+            application_count=application_count,
+        )
+
+    # 3) Close the job
+    job.status = JobStatus.closed
+    await db.commit()
+    await db.refresh(job)
+
+    # 4) Compute application_count for the response
+    result = await db.execute(
+        select(func.count(JobApplication.id)).where(
+            JobApplication.job_id == job.id
+        )
+    )
+    application_count = result.scalar() or 0
+
+    return JobOfferOut(
+        id=job.id,
+        title=job.title,
+        description=job.description,
+        category=job.category,
+        location=job.location,
+        budget_min=job.budget_min,
+        budget_max=job.budget_max,
+        status=job.status,
+        boost_until=job.boost_until,
+        client_id=job.client_id,
+        created_at=job.created_at,
+        application_count=application_count,
+    )
+

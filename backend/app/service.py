@@ -22,6 +22,7 @@ from .database import Base, get_db
 from .auth import get_verified_worker
 from .user import User
 
+
 router = APIRouter(prefix="/services", tags=["services"])
 
 
@@ -43,6 +44,8 @@ class Service(Base):
         DECIMAL(10, 2), nullable=True
     )
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
 
     created_at: Mapped["DateTime"] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -108,6 +111,25 @@ async def create_service(
     return service
 
 
+@router.get("/my", response_model=List[ServiceOut])
+async def list_my_services(
+    is_active: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_worker: User = Depends(get_verified_worker),
+):
+    """List services created by the current worker."""
+    query = select(Service).where(Service.provider_id == current_worker.id)
+
+    if is_active is not None:
+        query = query.where(Service.is_active == is_active)
+
+    query = query.order_by(Service.created_at.desc())
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+
 @router.get("", response_model=List[ServiceOut])
 async def list_services(
     category: Optional[str] = Query(None),
@@ -164,11 +186,29 @@ async def delete_service(
     current_worker: User = Depends(get_verified_worker),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete own service - VERIFIED WORKERS ONLY"""
+    """Delete or deactivate own service - VERIFIED WORKERS ONLY."""
     service = await db.get(Service, service_id)
     if not service or service.provider_id != current_worker.id:
         raise HTTPException(status_code=404, detail="Service not found")
 
+    # Local import to avoid circular import
+    from .bookings import Booking
+
+    # Check if there are bookings for this service
+    result = await db.execute(
+        select(Booking).where(Booking.service_id == service_id)
+    )
+    existing_booking = result.scalar_one_or_none()
+
+    if existing_booking:
+        # Deactivate instead of deleting
+        service.is_active = False
+        await db.commit()
+        await db.refresh(service)
+        # 204 has no body, so just return None
+        return None
+
+    # No bookings: safe to delete
     await db.delete(service)
     await db.commit()
     return None

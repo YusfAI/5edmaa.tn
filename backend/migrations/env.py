@@ -18,14 +18,22 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
+from app.config import settings
 from app.database import Base
+from app.user import User, WorkerProfile, ClientProfile
+from app.jobs import JobOffer, JobApplication
+from app.service import Service
+from app.bookings import Booking
+from app.reviews import Review
+from app.wallet import Wallet, Transaction
+from app.chat import Message
+from app.subscriptions import SubscriptionPlan, UserSubscription, JobBoost
 target_metadata = Base.metadata
 
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Alembic runs migrations synchronously, so use the sync PyMySQL driver here
+# even though the app itself connects with the async aiomysql driver.
+sync_database_url = settings.database_url.replace("+aiomysql", "+pymysql")
+config.set_main_option("sqlalchemy.url", sync_database_url)
 
 
 def run_migrations_offline() -> None:

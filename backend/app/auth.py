@@ -9,10 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from .auth_schemas import SimpleRegisterRequest
 from .config import settings
 from .database import get_db
 from .security import verify_password, hash_password
-from .user import User, UserRole, WorkerProfile, ClientProfile
+from .user import User, UserRole, WorkerProfile, ClientProfile , VerificationStatus
 
 
 
@@ -108,7 +109,64 @@ async def authenticate_user(email: str, password: str, db: AsyncSession) -> Opti
 
 
 
+@router.post("/register/simple", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+async def register_simple(
+    data: SimpleRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Simplified registration endpoint for JSON payloads (no file uploads)"""
+    from .wallet import Wallet  # local import: wallet.py imports from .auth, avoid circular import
+
+    # Validate role
+    try:
+        user_role = UserRole(data.role)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    # Check unique email/phone
+    result = await db.execute(select(User).where(User.email == data.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    result = await db.execute(select(User).where(User.phone == data.phone))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Phone already registered")
+
+    # Create user
+    user = User(
+        email=data.email,
+        phone=data.phone,
+        password_hash=hash_password(data.password),
+        role=user_role,
+    )
+    db.add(user)
+    await db.flush()
+
+    # Create profile
+    if user_role == UserRole.worker:
+        worker_profile = WorkerProfile(
+            user_id=user.id,
+            location=data.address,
+            verified=False,
+        )
+        db.add(worker_profile)
+    else:
+        client_profile = ClientProfile(
+            user_id=user.id,
+            location=data.address,
+        )
+        db.add(client_profile)
+
+    # Create wallet
+    wallet = Wallet(user_id=user.id, balance=0.0)
+    db.add(wallet)
+
+    await db.commit()
+    return RegisterResponse(id=user.id, email=user.email, role=user.role.value)
+
+
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+
 async def register(
     email: str = Form(...),
     phone: str = Form(...),
@@ -120,6 +178,8 @@ async def register(
     id_rear_photo: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    from .wallet import Wallet  # local import: wallet.py imports from .auth, avoid circular import
+
     # Validate role
     try:
         user_role = UserRole(role)
@@ -159,6 +219,8 @@ async def register(
             location=address,
         )
         db.add(client_profile)
+
+    db.add(Wallet(user_id=user.id, balance=0.0))
 
     # Save files on disk: uploads/user_<id>/
     import os, shutil
@@ -221,7 +283,6 @@ async def get_current_user(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
     )
-
     try:
         payload = jwt.decode(
             token,
@@ -244,56 +305,59 @@ async def get_current_user(
 
 async def get_verified_worker(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> User:
     if current_user.role != UserRole.worker:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Workers only",
         )
-    
-    # Eager load worker_profile to avoid lazy loading
+
     result = await db.execute(
         select(User)
         .options(selectinload(User.worker_profile))
         .where(User.id == current_user.id)
     )
     user = result.scalar_one()
-    
-    if not user.worker_profile or not user.worker_profile.verified:
+
+    if (
+        not user.worker_profile
+        or user.worker_profile.status != VerificationStatus.approved
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Worker account not verified yet",
+            detail="Worker account not approved yet",
         )
-    
+
     return user
 
 
 async def get_verified_client(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> User:
     if current_user.role != UserRole.client:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Clients only",
         )
-    
-    # Eager load client_profile to avoid lazy loading
+
     result = await db.execute(
         select(User)
         .options(selectinload(User.client_profile))
         .where(User.id == current_user.id)
-        .limit(1)
     )
     user = result.scalar_one()
-    
-    if not user.client_profile or not user.client_profile.verified:
+
+    if (
+        not user.client_profile
+        or user.client_profile.status != VerificationStatus.approved
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Client account not verified yet",
+            detail="Client account not approved yet",
         )
-    
+
     return user
 
 
@@ -346,6 +410,11 @@ async def update_worker_profile(
     if data.portfolio_urls is not None:
         profile.portfolio_urls = data.portfolio_urls
 
+    # Editing a rejected profile resubmits it for review
+    if profile.status == VerificationStatus.rejected:
+        profile.status = VerificationStatus.pending
+        profile.rejection_reason = None
+
     await db.commit()
     await db.refresh(profile)
 
@@ -386,6 +455,11 @@ async def update_client_profile(
         profile.bio = data.bio
     if data.location is not None:
         profile.location = data.location
+
+    # Editing a rejected profile resubmits it for review
+    if profile.status == VerificationStatus.rejected:
+        profile.status = VerificationStatus.pending
+        profile.rejection_reason = None
 
     await db.commit()
     await db.refresh(profile)
@@ -468,3 +542,17 @@ async def get_client_me(
     	verified=profile.verified,  # NEW
 )
 
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    phone: str
+    role: str
+
+@router.get("/me", response_model=UserResponse)
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        phone=current_user.phone,
+        role=current_user.role.value
+    )

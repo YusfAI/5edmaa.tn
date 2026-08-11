@@ -4,6 +4,12 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.user import User, UserRole
 from app.security import hash_password
+# Import all models to ensure relationships resolve
+from app.jobs import JobOffer
+from app.service import Service
+from app.bookings import Booking
+from app.reviews import Review
+from app.wallet import Wallet
 
 
 async def main():

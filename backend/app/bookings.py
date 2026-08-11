@@ -1,10 +1,6 @@
 from datetime import datetime
 from enum import Enum as PyEnum
 from typing import List, Optional
-from .service import Service
-from .auth import get_verified_client, get_verified_worker
-from .database import Base, get_db
-
 
 from sqlalchemy import (
     String,
@@ -21,9 +17,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 
 from .database import Base, get_db
-from .auth import get_verified_client, get_verified_worker
+from .auth import get_verified_client, get_verified_worker, get_current_user
 from .user import User
-from .service import Service  # Service model you already have
+from .service import Service
 
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
@@ -107,7 +103,9 @@ async def create_booking(
     service = await db.get(Service, data.service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
-
+  # 1b) Check service is active
+    if hasattr(service, "is_active") and not service.is_active:
+        raise HTTPException(status_code=400, detail="Service is not available")
     # 2) Create booking (pending)
     booking = Booking(
         service_id=service.id,
@@ -175,10 +173,33 @@ async def confirm_booking(
     return booking
 
 
+
+@router.post("/{booking_id}/complete", response_model=BookingOut)
+async def complete_booking(
+    booking_id: int,
+    current_worker: User = Depends(get_verified_worker),
+    db: AsyncSession = Depends(get_db),
+):
+    """Worker marks a confirmed booking as completed."""
+    booking = await db.get(Booking, booking_id)
+    if not booking or booking.provider_id != current_worker.id:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    if booking.status != BookingStatus.confirmed:
+        raise HTTPException(status_code=400, detail="Only confirmed bookings can be completed")
+
+    booking.status = BookingStatus.completed
+    await db.commit()
+    await db.refresh(booking)
+    return booking
+
+
+from .auth import get_current_user  # add this import alongside others [file:911]
+
 @router.post("/{booking_id}/cancel", response_model=BookingOut)
 async def cancel_booking(
     booking_id: int,
-    current_user: User = Depends(get_verified_client),  # will check role below
+    current_user: User = Depends(get_current_user),  # changed
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -201,3 +222,4 @@ async def cancel_booking(
     await db.commit()
     await db.refresh(booking)
     return booking
+
