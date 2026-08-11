@@ -349,11 +349,29 @@ def build_rapport() -> None:
             "Authentification par jeton JWT signé (HS256), durée de validité configurable.",
             "Séparation des rôles via des dépendances FastAPI dédiées (get_verified_worker, "
             "get_verified_client, get_current_admin) vérifiées à chaque requête sensible.",
-            "Le canal WebSocket de messagerie authentifie désormais l'utilisateur via son jeton JWT "
-            "(et non plus un identifiant transmis librement par le client, corrigé lors de cette itération).",
+            "Le canal WebSocket de messagerie authentifie l'utilisateur via son jeton JWT (et non un "
+            "identifiant transmis librement par le client).",
+            "Limitation de débit (10 requêtes/minute/IP) sur les endpoints de connexion et d'inscription, "
+            "contre les attaques par force brute.",
+            "En-têtes de sécurité systématiques (X-Frame-Options, nosniff, HSTS en production) et gestion "
+            "d'erreurs globale : aucune trace technique n'est jamais renvoyée au client.",
+            "Origines CORS restreintes à une liste blanche configurable, documentation interactive "
+            "(/docs, /redoc) désactivée en production.",
             "Secrets et données sensibles exclus du dépôt Git : fichier .env, photos de pièces d'identité "
             "(stockées localement, jamais versionnées).",
         ],
+    )
+
+    h2(doc, "4.4 Interface utilisateur")
+    para(
+        doc,
+        "L'interface a fait l'objet d'une refonte visuelle complète : palette de couleurs extraite "
+        "directement du logo officiel (bleu #0454B5, rouge #D8202B), animations d'entrée et de défilement "
+        "(Framer Motion) sur la page d'accueil, transitions de page cohérentes sur l'ensemble du site, et "
+        "favicon / image de partage (Open Graph) générés à partir du logo. Les pages de consultation des "
+        "offres et des services ont été rendues accessibles sans connexion — condition nécessaire à leur "
+        "indexation par les moteurs de recherche — l'action elle-même (postuler, réserver) restant réservée "
+        "aux utilisateurs connectés.",
     )
 
     h1(doc, "5. Fonctionnalités implémentées")
@@ -370,6 +388,7 @@ def build_rapport() -> None:
             ["Portefeuille", "Solde, historique de transactions, demande de recharge, validation admin."],
             ["Abonnements", "Plans Premium, achat via le portefeuille, boost d'offre."],
             ["Intelligence artificielle", "Génération de bio (travailleur) et de description de poste (client) via Groq."],
+            ["Référencement (SEO)", "Métadonnées complètes, plan de site, robots.txt, données structurées ; pages d'offres et de services consultables sans connexion."],
         ],
         widths=[4, 12.5],
     )
@@ -428,10 +447,43 @@ def build_rapport() -> None:
             "sur un poste différent — corrigé.",
             "Un fichier de configuration contenant un mot de passe de base de données en clair était "
             "versionné dans l'historique Git — l'historique complet du dépôt a été purgé de ce secret.",
+            "L'approbation d'un travailleur par l'administrateur mettait à jour le champ verified mais pas "
+            "le champ status — or c'est ce second champ que vérifient tous les endpoints réservés aux "
+            "travailleurs vérifiés. Un travailleur « approuvé » restait donc bloqué. Anomalie détectée en "
+            "testant le parcours complet contre la base de données réelle plutôt qu'en relisant "
+            "uniquement le code — corrigée et couverte par un test de non-régression.",
+            "L'endpoint d'inscription (formulaire avec pièce d'identité) acceptait le rôle « admin » "
+            "directement, permettant à quiconque de créer un compte administrateur — faille corrigée.",
+            "La feuille de style principale du frontend utilisait la syntaxe Tailwind CSS v3 alors que le "
+            "projet utilise Tailwind v4 ; la compilation réussissait sans erreur mais aucune classe "
+            "utilitaire n'était générée, laissant l'interface quasiment sans mise en forme. Anomalie "
+            "invisible aux vérifications automatiques (compilation, typage) et détectée uniquement en "
+            "affichant réellement l'application dans un navigateur — corrigée, puis chaque page modifiée "
+            "a été revérifiée visuellement par capture d'écran.",
         ],
     )
 
-    h1(doc, "8. Perspectives d'évolution")
+    h1(doc, "8. Tests automatisés")
+    para(
+        doc,
+        "Une suite de tests automatisés (pytest) couvre les parcours critiques du backend — inscription, "
+        "connexion, vérification par l'administrateur, cycle de vie complet d'une offre et d'une "
+        "candidature, portefeuille — en s'exécutant contre une base de données SQLite en mémoire, sans "
+        "dépendance à MySQL. Elle inclut un test de non-régression dédié au bug de vérification décrit "
+        "ci-dessus. L'ensemble du parcours applicatif a en complément été rejoué manuellement contre la "
+        "base de données MySQL réelle (inscription, vérification admin, publication d'offre, candidature, "
+        "acceptation, recharge de portefeuille, génération IA, avis) avant d'être nettoyé.",
+    )
+
+    h1(doc, "9. Déploiement")
+    para(
+        doc,
+        "Le projet est conteneurisé : un Dockerfile pour le backend, un pour le frontend (construction "
+        "Next.js autonome, sans node_modules dans l'image finale), et un fichier docker-compose.yml à la "
+        "racine orchestrant MySQL, le backend et le frontend ensemble pour un déploiement reproductible.",
+    )
+
+    h1(doc, "10. Perspectives d'évolution")
     bullets(
         doc,
         [
@@ -445,14 +497,14 @@ def build_rapport() -> None:
         ],
     )
 
-    h1(doc, "9. Conclusion")
+    h1(doc, "11. Conclusion")
     para(
         doc,
         "Cette itération a transformé un ensemble de prototypes fonctionnels mais fragiles en une base de "
-        "code cohérente, sécurisée et entièrement reliée à une interface utilisateur couvrant les trois "
-        "rôles de la plateforme. Les fondations techniques (base de données MySQL, authentification, "
-        "architecture API) sont désormais prêtes à accueillir les évolutions futures, au premier rang "
-        "desquelles l'intégration d'un moyen de paiement réel.",
+        "code cohérente, sécurisée, testée, conteneurisée et entièrement reliée à une interface utilisateur "
+        "soignée couvrant les trois rôles de la plateforme. Les fondations techniques (base de données "
+        "MySQL, authentification, architecture API, déploiement Docker) sont désormais prêtes à accueillir "
+        "les évolutions futures, au premier rang desquelles l'intégration d'un moyen de paiement réel.",
     )
 
     out = DOCS_DIR / "RAPPORT_5edma.tn.docx"
@@ -557,6 +609,10 @@ def build_guide() -> None:
             ["ALGORITHM", "Algorithme de signature JWT (HS256 par défaut)"],
             ["ACCESS_TOKEN_EXPIRE_MINUTES", "Durée de validité d'un jeton, en minutes"],
             ["GROQ_API_KEY", "Clé API Groq pour la génération de texte par IA (facultatif)"],
+            ["ENVIRONMENT", "« development » (défaut) ou « production » — désactive /docs et /redoc en production"],
+            ["DEBUG", "Active les logs SQL détaillés et les erreurs de validation verbeuses (lié à ENVIRONMENT par défaut)"],
+            ["ALLOWED_ORIGINS", "Liste d'origines CORS autorisées, séparées par des virgules"],
+            ["RATE_LIMIT_ENABLED", "Active la limitation de débit sur les endpoints d'authentification (true par défaut)"],
         ],
         widths=[6, 10.5],
     )
@@ -606,19 +662,38 @@ def build_guide() -> None:
     para(doc, "La liste complète et interactive des endpoints est disponible sur /docs (Swagger UI) une fois le serveur lancé.")
 
     h1(doc, "10. Tests")
-    code_line(doc, "pytest backend/tests")
+    code_line(doc, "cd backend && pytest")
+    para(
+        doc,
+        "S'exécute contre une base SQLite en mémoire (voir tests/conftest.py) — ni MySQL ni fichier .env "
+        "requis. Les scripts dans tests/manual/ nécessitent en revanche un serveur et une base réels et ne "
+        "sont pas ramassés par pytest (nommage volontairement différent de test_*.py).",
+    )
     para(
         doc,
         "Le frontend est vérifié via le compilateur TypeScript (npx tsc --noEmit), ESLint (npm run lint) "
-        "et une compilation de production (npm run build).",
+        "et une compilation de production (npm run build). Pour les changements d'interface, une "
+        "vérification visuelle réelle (navigateur) est indispensable : cette itération a justement révélé "
+        "un bug (voir le Rapport de projet, section 7) invisible à ces trois vérifications automatiques.",
     )
 
-    h1(doc, "11. Déploiement — notes générales")
+    h1(doc, "11. Déploiement")
+    h2(doc, "11.1 Avec Docker (recommandé)")
+    code_line(doc, "copy .env.example .env   # racine du dépôt")
+    code_line(doc, "docker compose up --build")
+    para(
+        doc,
+        "Démarre MySQL, le backend et le frontend ensemble. backend/Dockerfile et frontend/Dockerfile sont "
+        "tous deux multi-étapes ; le frontend construit le bundle autonome de Next.js (output: "
+        "'standalone'), qui ne nécessite pas node_modules dans l'image finale.",
+    )
+    h2(doc, "11.2 Sans Docker — notes générales")
     bullets(
         doc,
         [
             "Backend : servir via un serveur ASGI de production (ex. uvicorn derrière un reverse proxy, "
-            "ou gunicorn avec des workers uvicorn), avec les variables d'environnement de production.",
+            "ou gunicorn avec des workers uvicorn), avec les variables d'environnement de production "
+            "(ENVIRONMENT=production notamment).",
             "Frontend : npm run build puis npm run start, ou déploiement sur une plateforme compatible "
             "Next.js.",
             "Base de données : sauvegardes régulières, et ne jamais accorder au compte MySQL applicatif "

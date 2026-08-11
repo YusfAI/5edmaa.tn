@@ -28,5 +28,13 @@ uvicorn main:app --reload
 # Frontend
 cd frontend
 npm install
+copy .env.local.example .env.local
 npm run dev
+```
+
+Or with Docker (MySQL + backend + frontend together):
+
+```bash
+copy .env.example .env   # repo root — fill in MYSQL_ROOT_PASSWORD / SECRET_KEY / GROQ_API_KEY
+docker compose up --build
 ```
