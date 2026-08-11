@@ -52,7 +52,7 @@ export default function MyApplicationsPage() {
                 {apps.length === 0 ? (
                     <EmptyState>
                         Vous n&apos;avez postulé à aucune offre.{' '}
-                        <Link href="/jobs" className="text-[#DC143C] font-bold">
+                        <Link href="/jobs" className="text-[#D8202B] font-bold">
                             Parcourir les offres
                         </Link>
                     </EmptyState>

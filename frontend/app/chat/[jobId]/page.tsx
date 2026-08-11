@@ -77,7 +77,7 @@ export default function ChatPage() {
                                 <div
                                     className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm ${
                                         msg.sender_id === user.id
-                                            ? 'bg-[#DC143C] text-white'
+                                            ? 'bg-[#D8202B] text-white'
                                             : 'bg-gray-100 text-gray-900'
                                     }`}
                                 >

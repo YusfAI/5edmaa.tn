@@ -14,13 +14,11 @@ import {
     Textarea,
 } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRequireAuth } from '@/lib/hooks';
 import { apiErrorMessage, jobsService, subscriptionsService } from '@/lib/api';
 import type { JobApplication, JobOffer } from '@/lib/types';
 
 export default function JobDetailPage() {
-    const { loading } = useRequireAuth();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const params = useParams();
     const jobId = Number(params.id);
 
@@ -49,11 +47,11 @@ export default function JobDetailPage() {
     };
 
     useEffect(() => {
-        if (!loading && user) loadJob();
+        if (!loading) loadJob();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, user, jobId]);
 
-    if (loading || fetching || !user) return <FullPageSpinner />;
+    if (loading || fetching) return <FullPageSpinner />;
     if (!job) return <div className="p-12 text-center">{error || 'Offre introuvable'}</div>;
 
     const handleApply = async () => {
@@ -227,7 +225,24 @@ export default function JobDetailPage() {
                     </Card>
                 )}
 
-                {user.role === 'worker' && !isOwner && (
+                {!user && (
+                    <Card>
+                        <h2 className="text-xl font-black mb-2">Intéressé par cette offre ?</h2>
+                        <p className="text-gray-600 text-sm mb-4">
+                            Connectez-vous ou créez un compte travailleur pour postuler.
+                        </p>
+                        <div className="flex gap-3">
+                            <Link href="/login">
+                                <Button>Se connecter</Button>
+                            </Link>
+                            <Link href="/register">
+                                <Button variant="outline">Créer un compte</Button>
+                            </Link>
+                        </div>
+                    </Card>
+                )}
+
+                {user?.role === 'worker' && !isOwner && (
                     <Card>
                         <h2 className="text-xl font-black mb-4">Postuler à cette offre</h2>
                         <Textarea

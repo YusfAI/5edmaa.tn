@@ -93,7 +93,7 @@ export default function RegisterPage() {
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role })}
                                     className={`p-3 rounded-xl border-2 font-bold transition-all ${formData.role === role
-                                            ? 'border-[#DC143C] bg-red-50 text-[#DC143C]'
+                                            ? 'border-[#D8202B] bg-red-50 text-[#D8202B]'
                                             : 'border-gray-200 text-gray-600 hover:border-gray-300'
                                         }`}
                                 >
@@ -143,7 +143,7 @@ export default function RegisterPage() {
                     <div className="text-center pt-4">
                         <p className="text-gray-600 text-sm">
                             Déjà inscrit ?{' '}
-                            <Link href="/login" className="text-[#DC143C] font-bold hover:underline">
+                            <Link href="/login" className="text-[#D8202B] font-bold hover:underline">
                                 Se connecter
                             </Link>
                         </p>

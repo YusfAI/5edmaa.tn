@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'white';
     size?: 'sm' | 'md' | 'lg';
     children: React.ReactNode;
 }
@@ -16,10 +16,11 @@ export function Button({
     const baseStyles = 'font-bold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-        primary: 'bg-gradient-to-r from-[#DC143C] to-[#A01028] text-white hover:shadow-lg hover:shadow-red-500/30',
-        secondary: 'bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white hover:shadow-lg hover:shadow-blue-500/30',
-        outline: 'border-2 border-[#DC143C] text-[#DC143C] hover:bg-[#DC143C] hover:text-white',
+        primary: 'bg-gradient-to-r from-[#D8202B] to-[#A01522] text-white hover:shadow-lg hover:shadow-red-500/30',
+        secondary: 'bg-gradient-to-r from-[#0454B5] to-[#033A82] text-white hover:shadow-lg hover:shadow-blue-500/30',
+        outline: 'border-2 border-[#D8202B] text-[#D8202B] hover:bg-[#D8202B] hover:text-white',
         ghost: 'text-gray-700 hover:bg-gray-100',
+        white: 'bg-white text-[#D8202B] hover:shadow-xl',
     };
 
     const sizes = {
@@ -52,7 +53,7 @@ export function Input({ label, error, className = '', ...props }: InputProps) {
                 </label>
             )}
             <input
-                className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#DC143C] focus:outline-none transition-colors ${className}`}
+                className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#D8202B] focus:outline-none transition-colors ${className}`}
                 {...props}
             />
             {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
@@ -89,7 +90,7 @@ export function Textarea({ label, error, className = '', ...props }: TextareaPro
                 <label className="block text-sm font-bold text-gray-700 mb-2">{label}</label>
             )}
             <textarea
-                className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#DC143C] focus:outline-none transition-colors ${className}`}
+                className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#D8202B] focus:outline-none transition-colors ${className}`}
                 {...props}
             />
             {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
@@ -109,7 +110,7 @@ export function Select({ label, className = '', children, ...props }: SelectProp
                 <label className="block text-sm font-bold text-gray-700 mb-2">{label}</label>
             )}
             <select
-                className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#DC143C] focus:outline-none transition-colors bg-white ${className}`}
+                className={`w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#D8202B] focus:outline-none transition-colors bg-white ${className}`}
                 {...props}
             >
                 {children}
@@ -121,7 +122,7 @@ export function Select({ label, className = '', children, ...props }: SelectProp
 export function Spinner({ className = '' }: { className?: string }) {
     return (
         <div
-            className={`animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-[#DC143C] ${className}`}
+            className={`animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-[#D8202B] ${className}`}
         />
     );
 }

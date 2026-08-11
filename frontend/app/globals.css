@@ -1,10 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
-  --tunisian-red: #DC143C;
-  --tunisian-blue: #3B82F6;
+  /* Brand palette sampled directly from the 5edmaa.tn logo */
+  --brand-red: #D8202B;
+  --brand-red-dark: #A01522;
+  --brand-blue: #0454B5;
+  --brand-blue-dark: #033A82;
+  --brand-green: #10B981;
+
+  /* Kept for existing components that reference the old token names */
+  --tunisian-red: #D8202B;
+  --tunisian-blue: #0454B5;
   --tunisian-green: #10B981;
 }
 
@@ -15,40 +21,101 @@ body {
 }
 
 .glass {
-  background-color: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .tunisian-gradient {
-  background: linear-gradient(to right, #DC143C, #3B82F6, #10B981);
+  background: linear-gradient(115deg, var(--brand-red), var(--brand-blue) 70%);
 }
 
 .crimson-gradient {
-  background: linear-gradient(to bottom right, #DC143C, #A01028);
+  background: linear-gradient(to bottom right, var(--brand-red), var(--brand-red-dark));
+}
+
+.blue-gradient {
+  background: linear-gradient(to bottom right, var(--brand-blue), var(--brand-blue-dark));
+}
+
+.text-gradient {
+  background: linear-gradient(115deg, var(--brand-red), var(--brand-blue) 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .card-hover {
-  transition: all 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .card-hover:hover {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  transform: translateY(-4px);
+  box-shadow: 0 30px 60px -20px rgba(4, 84, 181, 0.25);
+  transform: translateY(-6px);
+}
+
+/* Luxury shadow used for elevated panels (wallet card, hero card, etc.) */
+.shadow-luxury {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 20px 40px -12px rgba(4, 84, 181, 0.18);
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-in;
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(14px);
   }
 
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Slow-drifting decorative gradient blobs used behind hero/section content */
+@keyframes blobFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(4%, -6%) scale(1.08); }
+  66% { transform: translate(-3%, 4%) scale(0.95); }
+}
+
+.animate-blob {
+  animation: blobFloat 18s ease-in-out infinite;
+}
+
+.animate-blob-delayed {
+  animation: blobFloat 22s ease-in-out infinite;
+  animation-delay: -8s;
+}
+
+/* Subtle continuous shimmer used on premium/highlight badges */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-blob,
+  .animate-blob-delayed,
+  .animate-shimmer {
+    animation: none;
   }
 }

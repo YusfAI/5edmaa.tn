@@ -5,13 +5,11 @@ import Link from 'next/link';
 import { Nav } from '@/components/Nav';
 import { Badge, Button, Card, EmptyState, FullPageSpinner, Input } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRequireAuth } from '@/lib/hooks';
 import { servicesService } from '@/lib/api';
 import type { Service } from '@/lib/types';
 
 export default function BrowseServicesPage() {
-    const { loading } = useRequireAuth();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const [services, setServices] = useState<Service[]>([]);
     const [category, setCategory] = useState('');
     const [location, setLocation] = useState('');
@@ -35,7 +33,7 @@ export default function BrowseServicesPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    if (loading || !user) return <FullPageSpinner />;
+    if (loading) return <FullPageSpinner />;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -43,7 +41,7 @@ export default function BrowseServicesPage() {
             <div className="max-w-5xl mx-auto px-6 py-12">
                 <div className="flex items-center justify-between mb-8">
                     <h1 className="text-3xl font-black">Trouver un professionnel</h1>
-                    {user.role === 'worker' && (
+                    {user?.role === 'worker' && (
                         <Link href="/services/new">
                             <Button>+ Publier un service</Button>
                         </Link>

@@ -54,7 +54,7 @@ export default function DashboardPage() {
                         <p className="text-3xl font-black">
                             {wallet ? `${wallet.balance} ${wallet.currency}` : '—'}
                         </p>
-                        <Link href="/wallet" className="text-[#DC143C] text-sm font-bold">
+                        <Link href="/wallet" className="text-[#D8202B] text-sm font-bold">
                             Voir le portefeuille →
                         </Link>
                     </Card>
@@ -76,7 +76,7 @@ export default function DashboardPage() {
                             <Card>
                                 <p className="text-gray-500 text-sm mb-1">Mes services</p>
                                 <p className="text-3xl font-black">{serviceCount ?? '—'}</p>
-                                <Link href="/services/mine" className="text-[#DC143C] text-sm font-bold">
+                                <Link href="/services/mine" className="text-[#D8202B] text-sm font-bold">
                                     Gérer →
                                 </Link>
                             </Card>
@@ -95,7 +95,7 @@ export default function DashboardPage() {
                             <Card>
                                 <p className="text-gray-500 text-sm mb-1">Mes offres publiées</p>
                                 <p className="text-3xl font-black">{jobCount ?? '—'}</p>
-                                <Link href="/jobs/mine" className="text-[#DC143C] text-sm font-bold">
+                                <Link href="/jobs/mine" className="text-[#D8202B] text-sm font-bold">
                                     Gérer →
                                 </Link>
                             </Card>
@@ -107,14 +107,14 @@ export default function DashboardPage() {
                             <Card>
                                 <p className="text-gray-500 text-sm mb-1">Travailleurs en attente</p>
                                 <p className="text-3xl font-black">{pendingCounts?.workers ?? '—'}</p>
-                                <Link href="/admin" className="text-[#DC143C] text-sm font-bold">
+                                <Link href="/admin" className="text-[#D8202B] text-sm font-bold">
                                     Vérifier →
                                 </Link>
                             </Card>
                             <Card>
                                 <p className="text-gray-500 text-sm mb-1">Clients en attente</p>
                                 <p className="text-3xl font-black">{pendingCounts?.clients ?? '—'}</p>
-                                <Link href="/admin" className="text-[#DC143C] text-sm font-bold">
+                                <Link href="/admin" className="text-[#D8202B] text-sm font-bold">
                                     Vérifier →
                                 </Link>
                             </Card>
@@ -126,7 +126,7 @@ export default function DashboardPage() {
                     <EmptyState>
                         Votre compte n&apos;est pas encore vérifié — vous pourrez postuler aux offres et
                         publier des services une fois approuvé par un administrateur.{' '}
-                        <Link href="/profile" className="text-[#DC143C] font-bold">
+                        <Link href="/profile" className="text-[#D8202B] font-bold">
                             Compléter mon profil
                         </Link>
                     </EmptyState>
@@ -135,7 +135,7 @@ export default function DashboardPage() {
                     <EmptyState>
                         Votre compte n&apos;est pas encore vérifié — vous pourrez publier des offres une
                         fois approuvé par un administrateur.{' '}
-                        <Link href="/profile" className="text-[#DC143C] font-bold">
+                        <Link href="/profile" className="text-[#D8202B] font-bold">
                             Compléter mon profil
                         </Link>
                     </EmptyState>

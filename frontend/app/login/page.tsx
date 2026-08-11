@@ -76,7 +76,7 @@ export default function LoginPage() {
                     <div className="text-center pt-4">
                         <p className="text-gray-600 text-sm">
                             Pas encore de compte ?{' '}
-                            <Link href="/register" className="text-[#DC143C] font-bold hover:underline">
+                            <Link href="/register" className="text-[#D8202B] font-bold hover:underline">
                                 S&apos;inscrire
                             </Link>
                         </p>

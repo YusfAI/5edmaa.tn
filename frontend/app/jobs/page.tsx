@@ -5,13 +5,11 @@ import Link from 'next/link';
 import { Nav } from '@/components/Nav';
 import { Badge, Button, Card, EmptyState, FullPageSpinner, Input } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRequireAuth } from '@/lib/hooks';
 import { jobsService } from '@/lib/api';
 import type { JobOffer } from '@/lib/types';
 
 export default function BrowseJobsPage() {
-    const { loading } = useRequireAuth();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const [jobs, setJobs] = useState<JobOffer[]>([]);
     const [category, setCategory] = useState('');
     const [location, setLocation] = useState('');
@@ -35,7 +33,7 @@ export default function BrowseJobsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    if (loading || !user) return <FullPageSpinner />;
+    if (loading) return <FullPageSpinner />;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -43,7 +41,7 @@ export default function BrowseJobsPage() {
             <div className="max-w-5xl mx-auto px-6 py-12">
                 <div className="flex items-center justify-between mb-8">
                     <h1 className="text-3xl font-black">Offres d&apos;emploi</h1>
-                    {user.role === 'client' && (
+                    {user?.role === 'client' && (
                         <Link href="/jobs/new">
                             <Button>+ Publier une offre</Button>
                         </Link>

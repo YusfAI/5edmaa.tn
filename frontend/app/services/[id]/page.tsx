@@ -3,15 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Nav } from '@/components/Nav';
+import Link from 'next/link';
 import { Alert, Badge, Button, Card, EmptyState, FullPageSpinner, Input, Stars, Textarea } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRequireAuth } from '@/lib/hooks';
 import { apiErrorMessage, bookingsService, reviewsService, servicesService } from '@/lib/api';
 import type { Review, Service } from '@/lib/types';
 
 export default function ServiceDetailPage() {
-    const { loading } = useRequireAuth();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const params = useParams();
     const serviceId = Number(params.id);
 
@@ -35,7 +34,7 @@ export default function ServiceDetailPage() {
             .finally(() => setFetching(false));
     }, [loading, serviceId]);
 
-    if (loading || fetching || !user) return <FullPageSpinner />;
+    if (loading || fetching) return <FullPageSpinner />;
     if (!service) return <div className="p-12 text-center">Service introuvable</div>;
 
     const avgRating = reviews.length
@@ -77,7 +76,24 @@ export default function ServiceDetailPage() {
                     <p className="text-gray-700 whitespace-pre-wrap mt-4">{service.description}</p>
                 </Card>
 
-                {user.role === 'client' && (
+                {!user && (
+                    <Card>
+                        <h2 className="text-xl font-black mb-2">Intéressé par ce service ?</h2>
+                        <p className="text-gray-600 text-sm mb-4">
+                            Connectez-vous ou créez un compte client pour réserver.
+                        </p>
+                        <div className="flex gap-3">
+                            <Link href="/login">
+                                <Button>Se connecter</Button>
+                            </Link>
+                            <Link href="/register">
+                                <Button variant="outline">Créer un compte</Button>
+                            </Link>
+                        </div>
+                    </Card>
+                )}
+
+                {user?.role === 'client' && (
                     <Card>
                         <h2 className="text-xl font-black mb-4">Réserver ce service</h2>
                         <div className="space-y-4">
