@@ -159,6 +159,18 @@ async def list_services(
     return result.scalars().all()
 
 
+@router.get("/{service_id}", response_model=ServiceOut)
+async def get_service(
+    service_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public service detail page."""
+    service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return service
+
+
 @router.patch("/{service_id}", response_model=ServiceOut)
 async def update_service(
     service_id: int,

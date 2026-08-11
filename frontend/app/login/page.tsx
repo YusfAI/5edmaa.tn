@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Input, Card } from '@/components/ui';
-import { authService } from '@/lib/api';
+import { Button, Input, Card, Alert } from '@/components/ui';
+import { apiErrorMessage, authService } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
     const router = useRouter();
+    const { refresh } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -20,9 +22,10 @@ export default function LoginPage() {
 
         try {
             await authService.login(email, password);
+            await refresh();
             router.push('/dashboard');
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'Login failed');
+        } catch (err) {
+            setError(apiErrorMessage(err, 'Email ou mot de passe incorrect'));
         } finally {
             setLoading(false);
         }
@@ -58,11 +61,7 @@ export default function LoginPage() {
                         required
                     />
 
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
-                            {error}
-                        </div>
-                    )}
+                    {error && <Alert>{error}</Alert>}
 
                     <Button
                         type="submit"
@@ -78,7 +77,7 @@ export default function LoginPage() {
                         <p className="text-gray-600 text-sm">
                             Pas encore de compte ?{' '}
                             <Link href="/register" className="text-[#DC143C] font-bold hover:underline">
-                                S'inscrire
+                                S&apos;inscrire
                             </Link>
                         </p>
                     </div>

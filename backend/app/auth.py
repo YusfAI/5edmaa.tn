@@ -34,6 +34,8 @@ class ClientMeResponse(BaseModel):
     location: Optional[str] = None
 
     verified: bool  # NEW
+    status: VerificationStatus
+    rejection_reason: Optional[str] = None
 
 
 class WorkerMeResponse(BaseModel):
@@ -53,6 +55,8 @@ class WorkerMeResponse(BaseModel):
 
     # Status flags
     verified: bool
+    status: VerificationStatus
+    rejection_reason: Optional[str] = None
     premium_until: Optional[datetime] = None
     rating: Optional[float] = None
 
@@ -505,6 +509,8 @@ async def get_worker_me(
         availability=profile.availability,
         portfolio_urls=profile.portfolio_urls,
         verified=profile.verified,
+        status=profile.status,
+        rejection_reason=profile.rejection_reason,
         premium_until=profile.premium_until,
         rating=float(profile.rating) if profile.rating is not None else None,
     )
@@ -539,7 +545,9 @@ async def get_client_me(
     	company_name=profile.company_name,
     	bio=profile.bio,
     	location=profile.location,
-    	verified=profile.verified,  # NEW
+    	verified=profile.verified,
+    	status=profile.status,
+    	rejection_reason=profile.rejection_reason,
 )
 
 class UserResponse(BaseModel):

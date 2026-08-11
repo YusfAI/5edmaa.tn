@@ -114,6 +114,11 @@ class JobApplicationOut(BaseModel):
     created_at: datetime
 
 
+class MyApplicationOut(JobApplicationOut):
+    job_title: str
+    job_status: JobStatus
+
+
 class JobOfferUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -258,6 +263,78 @@ async def list_my_jobs(
     ]
 
 
+
+
+@router.get("/applications/mine", response_model=List[MyApplicationOut])
+async def list_my_applications(
+    current_worker: User = Depends(get_verified_worker),
+    db: AsyncSession = Depends(get_db),
+):
+    """Worker: list every application they've submitted, across all jobs."""
+    result = await db.execute(
+        select(JobApplication, JobOffer)
+        .join(JobOffer, JobOffer.id == JobApplication.job_id)
+        .where(JobApplication.worker_id == current_worker.id)
+        .order_by(JobApplication.created_at.desc())
+    )
+    return [
+        MyApplicationOut(
+            id=app.id,
+            job_id=app.job_id,
+            worker_id=app.worker_id,
+            cover_message=app.cover_message,
+            status=app.status,
+            created_at=app.created_at,
+            job_title=job.title,
+            job_status=job.status,
+        )
+        for app, job in result.all()
+    ]
+
+
+@router.get("/{job_id}", response_model=JobOfferOut)
+async def get_job(
+    job_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    View a single job's details. Open jobs are visible to anyone logged in;
+    closed jobs are only visible to the owning client or a worker who applied.
+    """
+    job = await db.get(JobOffer, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != JobStatus.open and job.client_id != current_user.id:
+        result = await db.execute(
+            select(JobApplication).where(
+                JobApplication.job_id == job_id,
+                JobApplication.worker_id == current_user.id,
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Job not found")
+
+    result = await db.execute(
+        select(func.count(JobApplication.id)).where(JobApplication.job_id == job.id)
+    )
+    application_count = result.scalar() or 0
+
+    return JobOfferOut(
+        id=job.id,
+        title=job.title,
+        description=job.description,
+        category=job.category,
+        location=job.location,
+        budget_min=job.budget_min,
+        budget_max=job.budget_max,
+        status=job.status,
+        boost_until=job.boost_until,
+        client_id=job.client_id,
+        created_at=job.created_at,
+        application_count=application_count,
+    )
 
 
 @router.post("/{job_id}/apply", response_model=JobApplicationOut, status_code=status.HTTP_201_CREATED)

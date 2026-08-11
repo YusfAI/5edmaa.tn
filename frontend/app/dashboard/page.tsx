@@ -1,218 +1,145 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button, Input, Card, Badge } from '@/components/ui';
-import { authService } from '@/lib/api';
-import api from '@/lib/api';
-import { User, JobOffer } from '@/lib/types';
+import Link from 'next/link';
+import { Nav } from '@/components/Nav';
+import { Badge, Card, EmptyState, FullPageSpinner } from '@/components/ui';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRequireAuth } from '@/lib/hooks';
+import { adminService, jobsService, servicesService, walletService } from '@/lib/api';
+import type { Wallet } from '@/lib/types';
+
+function StatusBadge({ status }: { status: 'pending' | 'approved' | 'rejected' }) {
+    const variant = status === 'approved' ? 'success' : status === 'rejected' ? 'error' : 'warning';
+    const label = status === 'approved' ? 'Vérifié' : status === 'rejected' ? 'Rejeté' : 'En attente';
+    return <Badge variant={variant}>{label}</Badge>;
+}
 
 export default function DashboardPage() {
-    const router = useRouter();
-    const [user, setUser] = useState<User | null>(null);
-    const [jobs, setJobs] = useState<JobOffer[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    // Job form state
-    const [jobTitle, setJobTitle] = useState('');
-    const [jobDescription, setJobDescription] = useState('');
-    const [aiLoading, setAiLoading] = useState(false);
+    const { loading } = useRequireAuth();
+    const { user, workerProfile, clientProfile } = useAuth();
+    const [wallet, setWallet] = useState<Wallet | null>(null);
+    const [jobCount, setJobCount] = useState<number | null>(null);
+    const [serviceCount, setServiceCount] = useState<number | null>(null);
+    const [pendingCounts, setPendingCounts] = useState<{ workers: number; clients: number } | null>(null);
 
     useEffect(() => {
-        loadUser();
-    }, []);
+        if (!user) return;
+        walletService.me().then(setWallet).catch(() => {});
 
-    const loadUser = async () => {
-        try {
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
-
-            if (userData.role === 'client' || userData.role === 'admin') {
-                loadJobs();
-            }
-        } catch (error) {
-            router.push('/login');
-        } finally {
-            setLoading(false);
+        if (user.role === 'worker') {
+            servicesService.mine().then((s) => setServiceCount(s.length)).catch(() => {});
+        } else if (user.role === 'client') {
+            jobsService.mine().then((j) => setJobCount(j.length)).catch(() => {});
+        } else if (user.role === 'admin') {
+            Promise.all([adminService.pendingWorkers(), adminService.pendingClients()]).then(
+                ([workers, clients]) => setPendingCounts({ workers: workers.length, clients: clients.length })
+            ).catch(() => {});
         }
-    };
+    }, [user]);
 
-    const loadJobs = async () => {
-        try {
-            const response = await api.get('/jobs/my');
-            setJobs(response.data);
-        } catch (error) {
-            console.error('Failed to load jobs:', error);
-        }
-    };
-
-    const handleGenerateDescription = async () => {
-        if (!jobTitle) return;
-        setAiLoading(true);
-        try {
-            const response = await api.post('/ai/generate/job_description', {
-                title: jobTitle,
-                keywords: [],
-            });
-            setJobDescription(response.data.text);
-        } catch (error) {
-            console.error('AI generation failed:', error);
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
-    const handlePostJob = async () => {
-        if (!jobTitle || !jobDescription) return;
-        try {
-            const response = await api.post('/jobs', {
-                title: jobTitle,
-                description: jobDescription,
-                category: 'Général',
-                location: 'Tunis',
-                budget_min: 0,
-                budget_max: 100,
-            });
-            setJobs([response.data, ...jobs]);
-            setJobTitle('');
-            setJobDescription('');
-        } catch (error) {
-            console.error('Failed to post job:', error);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#DC143C]"></div>
-            </div>
-        );
-    }
-
-    if (!user) return null;
+    if (loading || !user) return <FullPageSpinner />;
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Nav */}
-            <nav className="glass border-b border-gray-200 sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="crimson-gradient p-2 rounded-xl">
-                            <span className="text-white text-2xl font-black">5</span>
-                        </div>
-                        <span className="text-2xl font-black">edma<span className="text-[#DC143C]">.tn</span></span>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <Badge variant="success">{user.role.toUpperCase()}</Badge>
-                        <Button variant="ghost" size="sm" onClick={authService.logout}>
-                            Déconnexion
-                        </Button>
-                    </div>
-                </div>
-            </nav>
-
-            {/* Content */}
+            <Nav />
             <div className="max-w-7xl mx-auto px-6 py-12">
-                <div className="grid lg:grid-cols-3 gap-8">
-                    {/* Sidebar */}
-                    <div className="lg:col-span-1">
-                        <Card>
-                            <div className="text-center mb-6">
-                                <div className="w-20 h-20 bg-gradient-to-br from-[#DC143C] to-[#A01028] rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-black">
-                                    {user.email[0].toUpperCase()}
-                                </div>
-                                <h2 className="text-xl font-black">{user.email}</h2>
-                                <p className="text-gray-600 text-sm">{user.phone || 'No phone'}</p>
-                            </div>
+                <h1 className="text-3xl font-black mb-8">
+                    Bonjour, {user.email.split('@')[0]} 👋
+                </h1>
 
-                            <div className="border-t pt-4 space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Mes Offres</span>
-                                    <span className="font-bold">{jobs.length}</span>
-                                </div>
-                            </div>
-                        </Card>
-                    </div>
+                <div className="grid md:grid-cols-3 gap-6 mb-10">
+                    <Card>
+                        <p className="text-gray-500 text-sm mb-1">Solde du portefeuille</p>
+                        <p className="text-3xl font-black">
+                            {wallet ? `${wallet.balance} ${wallet.currency}` : '—'}
+                        </p>
+                        <Link href="/wallet" className="text-[#DC143C] text-sm font-bold">
+                            Voir le portefeuille →
+                        </Link>
+                    </Card>
 
-                    {/* Main Content */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {/* Post Job */}
-                        {(user.role === 'client' || user.role === 'admin') && (
+                    {user.role === 'worker' && workerProfile && (
+                        <>
                             <Card>
-                                <h3 className="text-2xl font-black mb-6">Poster une Offre</h3>
-
-                                <div className="space-y-4">
-                                    <div className="flex gap-3">
-                                        <Input
-                                            placeholder="Ex: Réparation robinet"
-                                            value={jobTitle}
-                                            onChange={(e) => setJobTitle(e.target.value)}
-                                            className="flex-1"
-                                        />
-                                        <Button
-                                            variant="secondary"
-                                            onClick={handleGenerateDescription}
-                                            disabled={aiLoading || !jobTitle}
-                                        >
-                                            {aiLoading ? '⌛' : '🪄'} IA
-                                        </Button>
-                                    </div>
-
-                                    <textarea
-                                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#DC143C] focus:outline-none h-32"
-                                        placeholder="Description du travail..."
-                                        value={jobDescription}
-                                        onChange={(e) => setJobDescription(e.target.value)}
-                                    />
-
-                                    <Button
-                                        variant="primary"
-                                        size="lg"
-                                        className="w-full"
-                                        onClick={handlePostJob}
-                                        disabled={!jobTitle || !jobDescription}
-                                    >
-                                        Publier
-                                    </Button>
-                                </div>
-                            </Card>
-                        )}
-
-                        {/* Jobs List */}
-                        <div>
-                            <h3 className="text-2xl font-black mb-6">Mes Offres</h3>
-                            <div className="space-y-4">
-                                {jobs.length === 0 ? (
-                                    <Card>
-                                        <p className="text-center text-gray-600">Aucune offre pour le moment</p>
-                                    </Card>
-                                ) : (
-                                    jobs.map((job) => (
-                                        <Card key={job.id} hoverable>
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <h4 className="text-xl font-black">{job.title}</h4>
-                                                        <Badge variant={job.status === 'open' ? 'success' : 'default'}>
-                                                            {job.status === 'open' ? 'Ouvert' : 'Fermé'}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-gray-600 text-sm mb-2">{job.description}</p>
-                                                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                                                        <span>{job.category}</span>
-                                                        <span>{job.location}</span>
-                                                        <span>{job.application_count} candidats</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    ))
+                                <p className="text-gray-500 text-sm mb-1">Statut du compte</p>
+                                <StatusBadge status={workerProfile.status} />
+                                {workerProfile.status === 'rejected' && workerProfile.rejection_reason && (
+                                    <p className="text-xs text-red-600 mt-2">{workerProfile.rejection_reason}</p>
                                 )}
-                            </div>
-                        </div>
-                    </div>
+                                {workerProfile.status === 'pending' && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Complétez votre profil pour être vérifié par un admin.
+                                    </p>
+                                )}
+                            </Card>
+                            <Card>
+                                <p className="text-gray-500 text-sm mb-1">Mes services</p>
+                                <p className="text-3xl font-black">{serviceCount ?? '—'}</p>
+                                <Link href="/services/mine" className="text-[#DC143C] text-sm font-bold">
+                                    Gérer →
+                                </Link>
+                            </Card>
+                        </>
+                    )}
+
+                    {user.role === 'client' && clientProfile && (
+                        <>
+                            <Card>
+                                <p className="text-gray-500 text-sm mb-1">Statut du compte</p>
+                                <StatusBadge status={clientProfile.status} />
+                                {clientProfile.status === 'rejected' && clientProfile.rejection_reason && (
+                                    <p className="text-xs text-red-600 mt-2">{clientProfile.rejection_reason}</p>
+                                )}
+                            </Card>
+                            <Card>
+                                <p className="text-gray-500 text-sm mb-1">Mes offres publiées</p>
+                                <p className="text-3xl font-black">{jobCount ?? '—'}</p>
+                                <Link href="/jobs/mine" className="text-[#DC143C] text-sm font-bold">
+                                    Gérer →
+                                </Link>
+                            </Card>
+                        </>
+                    )}
+
+                    {user.role === 'admin' && (
+                        <>
+                            <Card>
+                                <p className="text-gray-500 text-sm mb-1">Travailleurs en attente</p>
+                                <p className="text-3xl font-black">{pendingCounts?.workers ?? '—'}</p>
+                                <Link href="/admin" className="text-[#DC143C] text-sm font-bold">
+                                    Vérifier →
+                                </Link>
+                            </Card>
+                            <Card>
+                                <p className="text-gray-500 text-sm mb-1">Clients en attente</p>
+                                <p className="text-3xl font-black">{pendingCounts?.clients ?? '—'}</p>
+                                <Link href="/admin" className="text-[#DC143C] text-sm font-bold">
+                                    Vérifier →
+                                </Link>
+                            </Card>
+                        </>
+                    )}
                 </div>
+
+                {user.role === 'worker' && !workerProfile?.verified && (
+                    <EmptyState>
+                        Votre compte n&apos;est pas encore vérifié — vous pourrez postuler aux offres et
+                        publier des services une fois approuvé par un administrateur.{' '}
+                        <Link href="/profile" className="text-[#DC143C] font-bold">
+                            Compléter mon profil
+                        </Link>
+                    </EmptyState>
+                )}
+                {user.role === 'client' && !clientProfile?.verified && (
+                    <EmptyState>
+                        Votre compte n&apos;est pas encore vérifié — vous pourrez publier des offres une
+                        fois approuvé par un administrateur.{' '}
+                        <Link href="/profile" className="text-[#DC143C] font-bold">
+                            Compléter mon profil
+                        </Link>
+                    </EmptyState>
+                )}
             </div>
         </div>
     );

@@ -3,17 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Input, Card } from '@/components/ui';
-import { authService } from '@/lib/api';
+import { Button, Input, Card, Alert } from '@/components/ui';
+import { apiErrorMessage, authService } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RegisterPage() {
     const router = useRouter();
+    const { refresh } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
         confirmPassword: '',
         phone: '',
-        role: 'client' as 'client' | 'worker' | 'admin',
+        address: '',
+        role: 'client' as 'client' | 'worker',
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -35,13 +38,15 @@ export default function RegisterPage() {
                 password: formData.password,
                 phone: formData.phone,
                 role: formData.role,
+                address: formData.address || 'Tunis',
             });
 
             // Auto-login after registration
             await authService.login(formData.email, formData.password);
+            await refresh();
             router.push('/dashboard');
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'Registration failed');
+        } catch (err) {
+            setError(apiErrorMessage(err, "L'inscription a échoué"));
         } finally {
             setLoading(false);
         }
@@ -99,6 +104,13 @@ export default function RegisterPage() {
                     </div>
 
                     <Input
+                        label="Ville"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        placeholder="Tunis"
+                    />
+
+                    <Input
                         label="Mot de passe"
                         type="password"
                         value={formData.password}
@@ -116,11 +128,7 @@ export default function RegisterPage() {
                         required
                     />
 
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
-                            {error}
-                        </div>
-                    )}
+                    {error && <Alert>{error}</Alert>}
 
                     <Button
                         type="submit"
