@@ -9,8 +9,14 @@ class Base(DeclarativeBase):
 
 engine = create_async_engine(
     settings.database_url,
-    echo=True,
+    echo=settings.debug,
     future=True,
+    # Verify connections before reuse and recycle them periodically — MySQL
+    # (and most managed DB hosts) silently drop idle connections, and
+    # without this every request after a quiet period would fail with a
+    # "MySQL server has gone away" error instead of transparently reconnecting.
+    pool_pre_ping=True,
+    pool_recycle=1800,
 )
 
 AsyncSessionLocal = async_sessionmaker(

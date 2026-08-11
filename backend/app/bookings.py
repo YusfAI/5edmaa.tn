@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .database import Base, get_db
 from .auth import get_verified_client, get_verified_worker, get_current_user
@@ -87,8 +87,7 @@ class BookingOut(BaseModel):
     note: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # === ENDPOINTS ===
 

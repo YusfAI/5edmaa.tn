@@ -16,10 +16,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from .database import Base, get_db
-from .auth import get_current_user, get_verified_client, get_verified_worker
+from .auth import get_optional_current_user, get_verified_client, get_verified_worker
 from .user import User, UserRole
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -72,18 +72,24 @@ class JobApplication(Base):
 
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    job: Mapped["JobOffer"] = relationship()
+    job: Mapped["JobOffer"] = relationship(overlaps="applications")
     worker: Mapped["User"] = relationship()
 
 
 # === Pydantic Schemas ===
 class JobOfferCreate(BaseModel):
-    title: str
-    description: str
-    category: str
-    location: str
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
+    title: str = Field(min_length=3, max_length=255)
+    description: str = Field(min_length=10)
+    category: str = Field(min_length=1, max_length=100)
+    location: str = Field(min_length=1, max_length=100)
+    budget_min: Optional[float] = Field(default=None, ge=0)
+    budget_max: Optional[float] = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def budget_range_is_valid(self):
+        if self.budget_min is not None and self.budget_max is not None and self.budget_min > self.budget_max:
+            raise ValueError("budget_min cannot be greater than budget_max")
+        return self
 
 
 class JobOfferOut(BaseModel):
@@ -138,7 +144,7 @@ async def create_job(
     """Create job offer - VERIFIED CLIENTS ONLY"""
     job = JobOffer(
         client_id=current_client.id,
-        **data.dict()
+        **data.model_dump()
     )
     db.add(job)
     await db.commit()
@@ -168,6 +174,8 @@ async def create_job(
 async def search_jobs(
     category: Optional[str] = Query(None),
     location: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     """Public search - no verification needed"""
@@ -186,7 +194,8 @@ async def search_jobs(
         JobOffer.created_at.desc(),
     )
 
-    result = await db.execute(query.limit(50))
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
     jobs = result.scalars().all()
 
     # Add application counts
@@ -295,26 +304,30 @@ async def list_my_applications(
 @router.get("/{job_id}", response_model=JobOfferOut)
 async def get_job(
     job_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    View a single job's details. Open jobs are visible to anyone logged in;
-    closed jobs are only visible to the owning client or a worker who applied.
+    View a single job's details. Open jobs are public (no login required —
+    these are the pages search engines should be able to index); closed jobs
+    are only visible to the owning client or a worker who applied.
     """
     job = await db.get(JobOffer, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status != JobStatus.open and job.client_id != current_user.id:
-        result = await db.execute(
-            select(JobApplication).where(
-                JobApplication.job_id == job_id,
-                JobApplication.worker_id == current_user.id,
-            )
-        )
-        if not result.scalar_one_or_none():
+    if job.status != JobStatus.open:
+        if not current_user:
             raise HTTPException(status_code=404, detail="Job not found")
+        if job.client_id != current_user.id:
+            result = await db.execute(
+                select(JobApplication).where(
+                    JobApplication.job_id == job_id,
+                    JobApplication.worker_id == current_user.id,
+                )
+            )
+            if not result.scalar_one_or_none():
+                raise HTTPException(status_code=404, detail="Job not found")
 
     result = await db.execute(
         select(func.count(JobApplication.id)).where(JobApplication.job_id == job.id)
@@ -598,7 +611,7 @@ async def update_job(
         )
 
     # 4) Apply allowed changes
-    update_data = data.dict(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(job, key, value)
 

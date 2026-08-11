@@ -8,7 +8,7 @@ from sqlalchemy import select
 from .jobs import JobOffer, JobApplication, JobApplicationStatus
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from pydantic import BaseModel, conint
+from pydantic import BaseModel, ConfigDict, conint
 
 from .database import Base, get_db
 from .user import User, WorkerProfile
@@ -65,8 +65,7 @@ class ReviewOut(BaseModel):
     comment: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 

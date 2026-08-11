@@ -3,7 +3,7 @@ from enum import Enum as PyEnum
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import (
     select,
     String,
@@ -90,8 +90,7 @@ class WalletOut(BaseModel):
     currency: str
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TransactionOut(BaseModel):
     id: int
@@ -103,8 +102,7 @@ class TransactionOut(BaseModel):
     description: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TopUpRequest(BaseModel):
     amount: float

@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional , List , Dict , Any 
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from .auth_schemas import SimpleRegisterRequest
 from .config import settings
 from .database import get_db
+from .rate_limit import limiter
 from .security import verify_password, hash_password
 from .user import User, UserRole, WorkerProfile, ClientProfile , VerificationStatus
 
@@ -90,7 +91,7 @@ class Token(BaseModel):
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    expire = datetime.now(timezone.utc) + (
         expires_delta
         if expires_delta is not None
         else timedelta(minutes=settings.access_token_expire_minutes)
@@ -114,7 +115,9 @@ async def authenticate_user(email: str, password: str, db: AsyncSession) -> Opti
 
 
 @router.post("/register/simple", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def register_simple(
+    request: Request,
     data: SimpleRegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -170,8 +173,9 @@ async def register_simple(
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-
+@limiter.limit("10/minute")
 async def register(
+    request: Request,
     email: str = Form(...),
     phone: str = Form(...),
     password: str = Form(...),
@@ -183,12 +187,20 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ):
     from .wallet import Wallet  # local import: wallet.py imports from .auth, avoid circular import
+    from .auth_schemas import PHONE_RE
 
-    # Validate role
-    try:
-        user_role = UserRole(role)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid role")
+    # Validate role — deliberately not UserRole(role): that would also accept
+    # "admin", letting anyone self-register an administrator account.
+    if role not in ("worker", "client"):
+        raise HTTPException(status_code=400, detail="Role must be 'worker' or 'client'")
+    user_role = UserRole(role)
+
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+    phone = phone.replace(" ", "")
+    if not PHONE_RE.match(phone):
+        raise HTTPException(status_code=400, detail="Phone must be 8 digits, optionally prefixed with +216")
 
     # Unique email/phone
     result = await db.execute(select(User).where(User.email == email))
@@ -258,7 +270,9 @@ async def register(
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
@@ -305,6 +319,30 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+_optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
+async def get_optional_current_user(
+    token: Optional[str] = Depends(_optional_oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """Like get_current_user, but returns None instead of 401 when there's no
+    (or an invalid) token — for endpoints that are public but personalize
+    their response when the caller happens to be logged in."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    return result.scalar_one_or_none()
 
 
 async def get_verified_worker(

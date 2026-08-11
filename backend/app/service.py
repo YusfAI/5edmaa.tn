@@ -16,7 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .database import Base, get_db
 from .auth import get_verified_worker
@@ -89,8 +89,7 @@ class ServiceOut(BaseModel):
     is_premium: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # === ENDPOINTS ===
 
@@ -103,7 +102,7 @@ async def create_service(
     """Create a service - VERIFIED WORKERS ONLY"""
     service = Service(
         provider_id=current_worker.id,
-        **data.dict(),
+        **data.model_dump(),
     )
     db.add(service)
     await db.commit()
@@ -136,10 +135,12 @@ async def list_services(
     location: Optional[str] = Query(None),
     provider_id: Optional[int] = Query(None),
     is_premium: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """Public services catalog"""
-    query = select(Service)
+    """Public services catalog — only currently-active services."""
+    query = select(Service).where(Service.is_active == True)  # noqa: E712
 
     if category:
         query = query.where(Service.category.ilike(f"%{category}%"))
@@ -155,7 +156,8 @@ async def list_services(
         Service.created_at.desc(),  # newest first
     )
 
-    result = await db.execute(query.limit(50))
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -183,7 +185,7 @@ async def update_service(
     if not service or service.provider_id != current_worker.id:
         raise HTTPException(status_code=404, detail="Service not found")
 
-    update_data = data.dict(exclude_unset=True)
+    update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(service, key, value)
 

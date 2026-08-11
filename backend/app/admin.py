@@ -95,6 +95,8 @@ async def verify_worker(
         raise HTTPException(status_code=400, detail="Worker already verified")
 
     profile.verified = True
+    profile.status = VerificationStatus.approved
+    profile.rejection_reason = None
     await db.commit()
     await db.refresh(profile)
     return {"message": f"Worker {user_id} verified", "verified": True}
