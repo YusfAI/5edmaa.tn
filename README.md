@@ -8,7 +8,11 @@ and dispute handling.
 - **[`frontend/`](frontend/)** — Next.js web app.
 - **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — data model, the two hiring flows
   (Jobs/Applications and Services/Bookings), and how the pieces fit together.
-- **[`UML/`](UML/)** — original use-case, class, and ERD diagrams.
+- **[`docs/uml/`](docs/uml/)** — use-case, class, and ERD diagrams matching the current
+  system (Mermaid sources in `docs/uml/src/`, rendered SVG/PNG alongside them).
+- **[`docs/RAPPORT_5edma.tn.docx`](docs/RAPPORT_5edma.tn.docx)** — rapport de projet (FR).
+- **[`docs/GUIDE_TECHNIQUE_5edma.tn.docx`](docs/GUIDE_TECHNIQUE_5edma.tn.docx)** — guide
+  technique d'installation et d'exploitation (FR).
 
 ## Quick start
 

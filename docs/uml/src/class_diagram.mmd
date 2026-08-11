@@ -1,0 +1,175 @@
+classDiagram
+    direction LR
+
+    class User {
+        +int id
+        +string email
+        +string phone
+        +string password_hash
+        +UserRole role
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class WorkerProfile {
+        +int user_id
+        +string bio
+        +string[] categories
+        +decimal hourly_rate
+        +string location
+        +json availability
+        +string[] portfolio_urls
+        +bool verified
+        +VerificationStatus status
+        +string rejection_reason
+        +datetime premium_until
+        +decimal rating
+    }
+
+    class ClientProfile {
+        +int user_id
+        +string full_name
+        +string company_name
+        +string bio
+        +string location
+        +bool verified
+        +VerificationStatus status
+        +string rejection_reason
+    }
+
+    class JobOffer {
+        +int id
+        +int client_id
+        +string title
+        +string description
+        +string category
+        +string location
+        +decimal budget_min
+        +decimal budget_max
+        +JobStatus status
+        +datetime boost_until
+        +datetime created_at
+    }
+
+    class JobApplication {
+        +int id
+        +int job_id
+        +int worker_id
+        +string cover_message
+        +ApplicationStatus status
+        +datetime created_at
+    }
+
+    class Service {
+        +int id
+        +int provider_id
+        +string title
+        +string description
+        +string category
+        +string location
+        +decimal base_price
+        +bool is_premium
+        +bool is_active
+        +datetime created_at
+    }
+
+    class Booking {
+        +int id
+        +int service_id
+        +int customer_id
+        +int provider_id
+        +datetime scheduled_for
+        +BookingStatus status
+        +string note
+        +datetime created_at
+    }
+
+    class Review {
+        +int id
+        +int booking_id
+        +int job_application_id
+        +int reviewer_id
+        +int reviewee_id
+        +int rating
+        +string comment
+        +datetime created_at
+    }
+
+    class Wallet {
+        +int user_id
+        +decimal balance
+        +string currency
+        +datetime updated_at
+    }
+
+    class Transaction {
+        +int id
+        +int user_id
+        +TransactionType type
+        +decimal amount
+        +TransactionStatus status
+        +string reference
+        +string description
+        +datetime created_at
+    }
+
+    class Message {
+        +int id
+        +int job_id
+        +int sender_id
+        +int receiver_id
+        +string content
+        +string[] attachments
+        +datetime created_at
+        +datetime read_at
+    }
+
+    class SubscriptionPlan {
+        +int id
+        +string name
+        +decimal price
+        +int duration_days
+        +json features
+        +bool is_active
+    }
+
+    class UserSubscription {
+        +int id
+        +int user_id
+        +int plan_id
+        +datetime start_date
+        +datetime end_date
+        +bool is_active
+    }
+
+    class JobBoost {
+        +int id
+        +int job_id
+        +string boost_type
+        +datetime end_date
+        +decimal price_paid
+    }
+
+    User "1" --> "0..1" WorkerProfile : possède
+    User "1" --> "0..1" ClientProfile : possède
+    User "1" --> "0..1" Wallet : possède
+    User "1" --> "0..*" JobOffer : publie
+    User "1" --> "0..*" JobApplication : postule
+    User "1" --> "0..*" Service : propose
+    User "1" --> "0..*" Booking : réserve (client)
+    User "1" --> "0..*" Booking : honore (prestataire)
+    User "1" --> "0..*" Transaction : effectue
+    User "1" --> "0..*" Message : envoie / reçoit
+    User "1" --> "0..*" Review : rédige / reçoit
+    User "1" --> "0..*" UserSubscription : souscrit
+
+    JobOffer "1" --> "0..*" JobApplication : reçoit
+    JobOffer "1" --> "0..*" Message : concerne
+    JobOffer "1" --> "0..*" JobBoost : est boosté par
+
+    Service "1" --> "0..*" Booking : réservé via
+
+    Booking "1" --> "0..1" Review : évalué par
+    JobApplication "1" --> "0..1" Review : évalué par
+
+    SubscriptionPlan "1" --> "0..*" UserSubscription : souscrit à

@@ -1,0 +1,82 @@
+flowchart TB
+    Groq{{"🤖 IA (Groq)"}}
+
+    subgraph RW[" "]
+        direction LR
+        Worker(["🧑‍🔧<br/>Travailleur"])
+        subgraph W["Espace Travailleur"]
+            direction TB
+            subgraph Wr1[" "]
+                direction LR
+                W1(["S'inscrire /<br/>Se connecter"])
+                W2(["Compléter le profil<br/>(bio, catégories, tarif)"])
+                W3(["Générer sa bio<br/>avec l'IA"])
+                W4(["Parcourir les offres"])
+                W5(["Postuler à une offre"])
+                W6(["Suivre / retirer<br/>une candidature"])
+                W7(["Publier un service"])
+            end
+            subgraph Wr2[" "]
+                direction LR
+                W8(["Gérer ses services"])
+                W9(["Confirmer une réservation"])
+                W10(["Terminer une réservation"])
+                W11(["Discuter avec un client"])
+                W12(["Consulter le portefeuille"])
+                W13(["Demander une recharge"])
+                W14(["Acheter un abonnement<br/>Premium"])
+            end
+        end
+    end
+
+    subgraph RC[" "]
+        direction LR
+        Client(["🧑‍💼<br/>Client"])
+        subgraph C["Espace Client"]
+            direction TB
+            subgraph Cr1[" "]
+                direction LR
+                C1(["S'inscrire /<br/>Se connecter"])
+                C2(["Compléter le profil"])
+                C3(["Publier une offre<br/>d'emploi"])
+                C4(["Générer la description<br/>avec l'IA"])
+                C5(["Consulter les<br/>candidatures"])
+                C6(["Accepter / refuser<br/>un candidat"])
+                C7(["Booster une offre"])
+                C8(["Rechercher des<br/>services / pros"])
+            end
+            subgraph Cr2[" "]
+                direction LR
+                C9(["Réserver un service"])
+                C10(["Annuler une réservation"])
+                C11(["Discuter avec<br/>un travailleur"])
+                C12(["Laisser un avis"])
+                C13(["Consulter le portefeuille"])
+                C14(["Demander une recharge"])
+                C15(["Acheter un abonnement<br/>Premium"])
+            end
+        end
+    end
+
+    subgraph RA[" "]
+        direction LR
+        Admin(["🛡️<br/>Administrateur"])
+        subgraph A["Espace Administrateur"]
+            direction LR
+            A1(["Consulter les travailleurs<br/>en attente"])
+            A2(["Approuver / rejeter<br/>un travailleur"])
+            A3(["Consulter les clients<br/>en attente"])
+            A4(["Approuver / rejeter<br/>un client"])
+            A5(["Consulter les recharges<br/>en attente"])
+            A6(["Approuver / rejeter<br/>une recharge"])
+        end
+    end
+
+    Worker --> W
+    Client --> C
+    Admin --> A
+
+    W3 -. utilise .-> Groq
+    C4 -. utilise .-> Groq
+    A2 -. déclenche .-> W12
+    A4 -. déclenche .-> C13

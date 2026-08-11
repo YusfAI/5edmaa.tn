@@ -1,0 +1,179 @@
+erDiagram
+    users {
+        int id PK
+        varchar email UK
+        varchar phone UK
+        varchar password_hash
+        enum role
+        datetime created_at
+        datetime updated_at
+    }
+
+    worker_profiles {
+        int user_id PK "FK -> users.id"
+        text bio
+        json categories
+        decimal hourly_rate
+        varchar location
+        json availability
+        json portfolio_urls
+        boolean verified
+        enum status
+        text rejection_reason
+        datetime premium_until
+        decimal rating
+    }
+
+    client_profiles {
+        int user_id PK "FK -> users.id"
+        varchar company_name
+        varchar location
+        varchar full_name
+        text bio
+        boolean verified
+        enum status
+        text rejection_reason
+    }
+
+    job_offers {
+        int id PK
+        int client_id FK
+        varchar title
+        text description
+        varchar category
+        varchar location
+        decimal budget_min
+        decimal budget_max
+        enum status
+        datetime boost_until
+        datetime created_at
+        datetime updated_at
+    }
+
+    job_applications {
+        int id PK
+        int job_id FK
+        int worker_id FK
+        text cover_message
+        enum status
+        datetime created_at
+    }
+
+    services {
+        int id PK
+        int provider_id FK
+        varchar title
+        text description
+        varchar category
+        varchar location
+        decimal base_price
+        boolean is_premium
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
+    bookings {
+        int id PK
+        int service_id FK
+        int customer_id FK
+        int provider_id FK
+        datetime scheduled_for
+        enum status
+        varchar note
+        datetime created_at
+    }
+
+    reviews {
+        int id PK
+        int booking_id FK "nullable"
+        int job_application_id FK "nullable"
+        int reviewer_id FK
+        int reviewee_id FK
+        smallint rating "1-5"
+        text comment
+        datetime created_at
+    }
+
+    wallets {
+        int user_id PK "FK -> users.id"
+        decimal balance
+        varchar currency
+        datetime updated_at
+    }
+
+    transactions {
+        int id PK
+        int user_id FK
+        enum type
+        decimal amount
+        enum status
+        varchar reference
+        varchar description
+        datetime created_at
+    }
+
+    messages {
+        int id PK
+        int job_id FK
+        int sender_id FK
+        int receiver_id FK
+        text content
+        json attachments
+        datetime created_at
+        datetime read_at
+    }
+
+    subscription_plans {
+        int id PK
+        varchar name
+        varchar description
+        decimal price
+        int duration_days
+        json features
+        boolean is_active
+    }
+
+    user_subscriptions {
+        int id PK
+        int user_id FK
+        int plan_id FK
+        datetime start_date
+        datetime end_date
+        boolean is_active
+    }
+
+    job_boosts {
+        int id PK
+        int job_id FK
+        varchar boost_type
+        datetime start_date
+        datetime end_date
+        decimal price_paid
+    }
+
+    users ||--o| worker_profiles : "1:0..1"
+    users ||--o| client_profiles : "1:0..1"
+    users ||--o| wallets : "1:0..1"
+    users ||--o{ job_offers : "1:0..*"
+    users ||--o{ job_applications : "1:0..*"
+    users ||--o{ services : "1:0..*"
+    users ||--o{ bookings : "1:0..* (client)"
+    users ||--o{ bookings : "1:0..* (prestataire)"
+    users ||--o{ transactions : "1:0..*"
+    users ||--o{ messages : "1:0..* (envoyeur)"
+    users ||--o{ messages : "1:0..* (destinataire)"
+    users ||--o{ reviews : "1:0..* (auteur)"
+    users ||--o{ reviews : "1:0..* (évalué)"
+    users ||--o{ user_subscriptions : "1:0..*"
+
+    job_offers ||--o{ job_applications : "1:0..*"
+    job_offers ||--o{ messages : "1:0..*"
+    job_offers ||--o{ job_boosts : "1:0..*"
+
+    services ||--o{ bookings : "1:0..*"
+
+    bookings ||--o| reviews : "1:0..1"
+    job_applications ||--o| reviews : "1:0..1"
+
+    subscription_plans ||--o{ user_subscriptions : "1:0..*"
