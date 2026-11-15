@@ -61,6 +61,18 @@ async def _fresh_schema():
         await conn.run_sync(Base.metadata.drop_all)
 
 
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _dispose_engine():
+    """Close the shared SQLite connection once the session ends.
+
+    aiosqlite runs each connection in a non-daemon worker thread; with
+    StaticPool that connection is never returned/closed, so without this the
+    interpreter waits on the thread forever after the last test passes.
+    """
+    yield
+    await test_engine.dispose()
+
+
 @pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)

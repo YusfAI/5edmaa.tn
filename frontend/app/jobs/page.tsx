@@ -71,7 +71,7 @@ export default function BrowseJobsPage() {
                 ) : (
                     <div className="space-y-4">
                         {jobs.map((job) => (
-                            <Link key={job.id} href={`/jobs/${job.id}`}>
+                            <Link key={job.id} href={`/jobs/${job.id}`} className="block">
                                 <Card hoverable>
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex-1">

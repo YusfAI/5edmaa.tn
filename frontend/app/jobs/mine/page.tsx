@@ -36,7 +36,7 @@ export default function MyJobsPage() {
                 ) : (
                     <div className="space-y-4">
                         {jobs.map((job) => (
-                            <Link key={job.id} href={`/jobs/${job.id}`}>
+                            <Link key={job.id} href={`/jobs/${job.id}`} className="block">
                                 <Card hoverable>
                                     <div className="flex items-center justify-between gap-4">
                                         <div>
